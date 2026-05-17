@@ -51,6 +51,7 @@ res.send(result)
 
 app.post("/parcels", async(req,res)=>{
   const parcel = req.body;
+  parcel.createdAt = new Date()
   const result = await parcelsCollection.insertOne(parcel)
   res.send(result);
 })
