@@ -3,11 +3,13 @@ const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 //_____________________________________________
+require('dotenv').config()
+const stripe = require('stripe')(process.env.STRIPE_SECRET);
+
 
 const express = require('express')
 const cors = require('cors')
 const app = express()
-require('dotenv').config()
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 3000
 
@@ -68,6 +70,29 @@ app.delete("/parcels/:id", async(req, res)=>{
   const query = {_id: new ObjectId(id)}
   const result = await parcelsCollection.deleteOne(query)
   res.send(result);
+})
+
+// stripe payment apis 
+app.post('/create-checkout-session', async(req, res)=>{
+  const paymentInfo = req.body
+  const session = await stripe.checkout.sessions.create({
+    line_items: [
+      {
+        // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+        price_data:{
+          currency:"USD",
+          product_data:{
+            name: paymentInfo.parcelName
+          },
+          unit_amount:1500,
+        },
+        quantity: 1,
+      },
+    ],
+    customer_email: paymentInfo.senderEmail,
+    mode: 'payment',
+    success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+  })
 })
 
 
