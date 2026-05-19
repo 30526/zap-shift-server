@@ -75,7 +75,7 @@ app.delete("/parcels/:id", async(req, res)=>{
 // stripe payment apis 
 app.post('/create-checkout-session', async(req, res)=>{
   const paymentInfo = req.body
-  const amount = parseInt(paymentInfo.const) * 100;
+  const amount = parseInt(paymentInfo.cost) * 100;
   const session = await stripe.checkout.sessions.create({
     line_items: [
       {
@@ -94,9 +94,10 @@ app.post('/create-checkout-session', async(req, res)=>{
     metadata:{
       parcelId: paymentInfo.parcelId,
     },
-    success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+    success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
   })
+  res.send({url: session.url})
 })
 
 
