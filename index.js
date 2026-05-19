@@ -91,6 +91,9 @@ app.post('/create-checkout-session', async(req, res)=>{
     ],
     customer_email: paymentInfo.senderEmail,
     mode: 'payment',
+    metadata:{
+      parcelId: paymentInfo.parcelId,
+    },
     success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
   })
 })
