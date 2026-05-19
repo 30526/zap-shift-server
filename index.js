@@ -95,6 +95,7 @@ app.post('/create-checkout-session', async(req, res)=>{
       parcelId: paymentInfo.parcelId,
     },
     success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+    cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
   })
 })
 
