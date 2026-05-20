@@ -16,6 +16,20 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cors());
 
+// tracking id
+const crypto = require("crypto"); // Built-in Node.js module
+
+const generateTrackingId = (prefix = "YSR") => {
+  // Generate 8 random bytes (16 hex characters) safely
+  const randomBytes = crypto.randomBytes(8).toString("hex").toUpperCase();
+
+  // Format into a clean, human-readable structure (e.g., YSR-XXXX-XXXX)
+  const part1 = randomBytes.slice(0, 4);
+  const part2 = randomBytes.slice(4, 8);
+
+  return `${prefix}-${part1}-${part2}`;
+};
+
 // mondo db uri
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.iphtjo4.mongodb.net/?appName=Cluster0`;
 
@@ -105,12 +119,14 @@ async function run() {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      const trackingId = generateTrackingId();
       if (session.payment_status === "paid") {
         const id = session.metadata.parcelId;
         const query = { _id: new ObjectId(id) };
         const update = {
           $set: {
             paymentStatus: "paid",
+            trackingId: trackingId,
           },
         };
         const result = await parcelsCollection.updateOne(query, update);
@@ -122,16 +138,17 @@ async function run() {
           customerEmail: session.customer_email,
           parcelId: session.metadata.parcelId,
           parcelName: session.metadata.parcelName,
-          transactionId: session.payment_intentm,
+          transactionId: session.payment_intent,
           paymentStatus: session.payment_status,
-          paidAt = new Date(),
-          trackingId:'',
+          paidAt: new Date(),
         };
         if (session.payment_status === "paid") {
           const resultPayment = await paymentCollection.insertOne(paymentInfo);
           res.send({
             success: true,
             modifyParcel: result,
+            trackingId: trackingId,
+            transactionId: session.payment_intent,
             paymentInfo: resultPayment,
           });
         }
