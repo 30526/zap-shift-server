@@ -35,6 +35,7 @@ async function run() {
 
     const db = client.db("zap_shift_db");
     const parcelsCollection = db.collection("parcels");
+    const paymentCollection = db.collection("payments");
 
     // parcels api
     app.get("/parcels", async (req, res) => {
@@ -92,6 +93,7 @@ async function run() {
         mode: "payment",
         metadata: {
           parcelId: paymentInfo.parcelId,
+          parcelName: paymentInfo.parcelName,
         },
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
@@ -112,7 +114,27 @@ async function run() {
           },
         };
         const result = await parcelsCollection.updateOne(query, update);
-        res.send(result);
+
+        // retrive payment data to add it to payment history
+        const paymentInfo = {
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          customerEmail: session.customer_email,
+          parcelId: session.metadata.parcelId,
+          parcelName: session.metadata.parcelName,
+          transactionId: session.payment_intentm,
+          paymentStatus: session.payment_status,
+          paidAt = new Date(),
+          trackingId:'',
+        };
+        if (session.payment_status === "paid") {
+          const resultPayment = await paymentCollection.insertOne(paymentInfo);
+          res.send({
+            success: true,
+            modifyParcel: result,
+            paymentInfo: resultPayment,
+          });
+        }
       }
 
       res.send({ success: false });
