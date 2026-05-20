@@ -1,23 +1,22 @@
-// forcing ipv4 to resolve error 
+// forcing ipv4 to resolve error
 const dns = require("dns");
 dns.setDefaultResultOrder("ipv4first");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 //_____________________________________________
-require('dotenv').config()
-const stripe = require('stripe')(process.env.STRIPE_SECRET);
+require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
-
-const express = require('express')
-const cors = require('cors')
-const app = express()
-const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const port = process.env.PORT || 3000
+const express = require("express");
+const cors = require("cors");
+const app = express();
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const port = process.env.PORT || 3000;
 
 // middlewear
-app.use(express.json())
-app.use(cors())
+app.use(express.json());
+app.use(cors());
 
-// mondo db uri 
+// mondo db uri
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.iphtjo4.mongodb.net/?appName=Cluster0`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -26,7 +25,7 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
@@ -34,81 +33,96 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
-const db = client.db('zap_shift_db')
-const parcelsCollection = db.collection('parcels')
+    const db = client.db("zap_shift_db");
+    const parcelsCollection = db.collection("parcels");
 
-// parcels api
-app.get("/parcels", async (req, res)=>{
-const query ={}
-const {email}= req.query;
-if(email){
-  query.senderEmail = email;
-}
+    // parcels api
+    app.get("/parcels", async (req, res) => {
+      const query = {};
+      const { email } = req.query;
+      if (email) {
+        query.senderEmail = email;
+      }
 
-const options = {sort: {createdAt:-1}}
-const cursor = parcelsCollection.find(query, options)
-const result = await  cursor.toArray();
-res.send(result)
-})
+      const options = { sort: { createdAt: -1 } };
+      const cursor = parcelsCollection.find(query, options);
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
-app.get("/parcels/:id", async(req, res)=>{
-  const id = req.params.id
-  const query = {_id: new ObjectId(id)}
-  const result = await parcelsCollection.findOne(query)
-  res.send(result)
-})
+    app.get("/parcels/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await parcelsCollection.findOne(query);
+      res.send(result);
+    });
 
-app.post("/parcels", async(req,res)=>{
-  const parcel = req.body;
-  parcel.createdAt = new Date()
-  const result = await parcelsCollection.insertOne(parcel)
-  res.send(result);
-})
+    app.post("/parcels", async (req, res) => {
+      const parcel = req.body;
+      parcel.createdAt = new Date();
+      const result = await parcelsCollection.insertOne(parcel);
+      res.send(result);
+    });
 
-app.delete("/parcels/:id", async(req, res)=>{
-  const id = req.params.id
-  const query = {_id: new ObjectId(id)}
-  const result = await parcelsCollection.deleteOne(query)
-  res.send(result);
-})
+    app.delete("/parcels/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await parcelsCollection.deleteOne(query);
+      res.send(result);
+    });
 
-// stripe payment apis 
-app.post('/create-checkout-session', async(req, res)=>{
-  const paymentInfo = req.body
-  const amount = parseInt(paymentInfo.cost) * 100;
-  const session = await stripe.checkout.sessions.create({
-    line_items: [
-      {
-        price_data:{
-          currency:"USD",
-          product_data:{
-            name: paymentInfo.parcelName
+    // stripe payment apis
+    app.post("/create-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.cost) * 100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "USD",
+              product_data: {
+                name: paymentInfo.parcelName,
+              },
+              unit_amount: amount,
+            },
+            quantity: 1,
           },
-          unit_amount:amount,
+        ],
+        customer_email: paymentInfo.senderEmail,
+        mode: "payment",
+        metadata: {
+          parcelId: paymentInfo.parcelId,
         },
-        quantity: 1,
-      },
-    ],
-    customer_email: paymentInfo.senderEmail,
-    mode: 'payment',
-    metadata:{
-      parcelId: paymentInfo.parcelId,
-    },
-    success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
-  })
-  res.send({url: session.url})
-})
+        success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
+      });
+      res.send({ url: session.url });
+    });
 
-app.patch("/payment-success", async(req, res)=>{
-  const sessionId = req.query.session_id
-  res.send({success: true})
-})
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
 
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === "paid") {
+        const id = session.metadata.parcelId;
+        const query = { _id: new ObjectId(id) };
+        const update = {
+          $set: {
+            paymentStatus: "paid",
+          },
+        };
+        const result = await parcelsCollection.updateOne(query, update);
+        res.send(result);
+      }
+
+      res.send({ success: false });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!",
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -116,10 +130,10 @@ app.patch("/payment-success", async(req, res)=>{
 }
 run().catch(console.dir);
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
-})
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
 
 app.listen(port, () => {
-  console.log(`Example app listening on port ${port}`)
-})
+  console.log(`Example app listening on port ${port}`);
+});
