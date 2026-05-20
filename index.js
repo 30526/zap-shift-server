@@ -100,6 +100,11 @@ app.post('/create-checkout-session', async(req, res)=>{
   res.send({url: session.url})
 })
 
+app.patch("/payment-success", async(req, res)=>{
+  const sessionId = req.query.session_id
+  res.send({success: true})
+})
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
