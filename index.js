@@ -16,25 +16,31 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cors());
 
-
-// firebase admin 
+// firebase admin
 const admin = require("firebase-admin");
 
 const serviceAccount = require("./zapshift-firebase-adminsdk.json");
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
-
 // custom middlewear for access verification
-const verifyFirebaseToken = (req, res, next) => {
-  console.log("In the middlewear", req.headers.authorization);
+const verifyFirebaseToken = async (req, res, next) => {
+  // console.log("In the middlewear", req.headers.authorization);
   const token = req.headers.authorization;
-  if(!token){
-    res.status(401).send({message: "Unauthorize access"})
+  if (!token) {
+    res.status(401).send({ message: "Unauthorize access" });
   }
-  next();
+  try {
+    const idToken = token.split(" ")[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    // console.log("decoded in the token", decoded);
+    req.decoded_email = decoded.email;
+    next();
+  } catch (err) {
+    return res.status(401).send({ message: "Unauthorize access" });
+  }
 };
 
 // tracking id
@@ -69,8 +75,19 @@ async function run() {
     await client.connect();
 
     const db = client.db("zap_shift_db");
+    const userCollection = db.collection("users");
     const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
+
+    // user related api
+    app.post("/user", async (req, res) => {
+      const user = req.body;
+      user.role = "user";
+      user.createdAt = new Date();
+
+      const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
 
     // parcels api
     app.get("/parcels", async (req, res) => {
@@ -198,8 +215,13 @@ async function run() {
       const query = {};
       if (email) {
         query.customerEmail = email;
+
+        if (email !== req.decoded_email) {
+          return res.status(403).send({ message: "Forbidden access" });
+        }
       }
-      const cursor = paymentCollection.find(query);
+
+      const cursor = paymentCollection.find(query).sort({ paidAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
