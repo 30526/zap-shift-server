@@ -16,6 +16,27 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cors());
 
+
+// firebase admin 
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./zapshift-firebase-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+
+// custom middlewear for access verification
+const verifyFirebaseToken = (req, res, next) => {
+  console.log("In the middlewear", req.headers.authorization);
+  const token = req.headers.authorization;
+  if(!token){
+    res.status(401).send({message: "Unauthorize access"})
+  }
+  next();
+};
+
 // tracking id
 const crypto = require("crypto"); // Built-in Node.js module
 
@@ -172,7 +193,7 @@ async function run() {
     });
 
     // payments history
-    app.get("/payments", async (req, res) => {
+    app.get("/payments", verifyFirebaseToken, async (req, res) => {
       const email = req.query.email;
       const query = {};
       if (email) {
