@@ -78,12 +78,21 @@ async function run() {
     const userCollection = db.collection("users");
     const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
+    const ridersCollection = db.collection("riders");
 
     // user related api
-    app.post("/user", async (req, res) => {
+    app.post("/users", async (req, res) => {
       const user = req.body;
       user.role = "user";
       user.createdAt = new Date();
+
+      // check if user is already exist
+      const email = user.email;
+      const userExist = await userCollection.findOne({ email });
+
+      if (userExist) {
+        return res.send({ message: "User already exist" });
+      }
 
       const result = await userCollection.insertOne(user);
       res.send(result);
@@ -121,6 +130,16 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await parcelsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // riders related apis
+    app.post("/riders", async (req, res) => {
+      const rider = req.body;
+      rider.status = "pending";
+      rider.createdAt = new Date();
+
+      const result = await ridersCollection.insertOne(rider);
       res.send(result);
     });
 
