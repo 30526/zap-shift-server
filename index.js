@@ -27,7 +27,7 @@ admin.initializeApp({
 
 // custom middlewear for access verification
 const verifyFirebaseToken = async (req, res, next) => {
-  console.log("In the middlewear", req.headers.authorization);
+  // console.log("In the middlewear", req.headers.authorization);
   const token = req.headers.authorization;
   if (!token) {
     return res.status(401).send({ message: "Unauthorize access" });
@@ -35,7 +35,7 @@ const verifyFirebaseToken = async (req, res, next) => {
   try {
     const idToken = token.split(" ")[1];
     const decoded = await admin.auth().verifyIdToken(idToken);
-    console.log("decoded in the token", decoded);
+    // console.log("decoded in the token", decoded);
     req.decoded_email = decoded.email;
     next();
   } catch (err) {
@@ -101,6 +101,19 @@ async function run() {
       }
 
       const result = await userCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.patch("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      const role = req.body.role;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: role,
+        },
+      };
+      const result = await userCollection.updateOne(query, updateDoc);
       res.send(result);
     });
 
