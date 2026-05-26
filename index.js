@@ -27,15 +27,15 @@ admin.initializeApp({
 
 // custom middlewear for access verification
 const verifyFirebaseToken = async (req, res, next) => {
-  // console.log("In the middlewear", req.headers.authorization);
+  console.log("In the middlewear", req.headers.authorization);
   const token = req.headers.authorization;
   if (!token) {
-    res.status(401).send({ message: "Unauthorize access" });
+    return res.status(401).send({ message: "Unauthorize access" });
   }
   try {
     const idToken = token.split(" ")[1];
     const decoded = await admin.auth().verifyIdToken(idToken);
-    // console.log("decoded in the token", decoded);
+    console.log("decoded in the token", decoded);
     req.decoded_email = decoded.email;
     next();
   } catch (err) {
@@ -81,6 +81,12 @@ async function run() {
     const ridersCollection = db.collection("riders");
 
     // user related api
+    app.get("/users", async (req, res) => {
+      const cursor = userCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       user.role = "user";
