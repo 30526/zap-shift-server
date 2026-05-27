@@ -92,7 +92,24 @@ async function run() {
     };
     // user related api
     app.get("/users", verifyFirebaseToken, async (req, res) => {
-      const cursor = userCollection.find();
+      const search = req.query.search;
+      const role = req.query.role;
+      const query = {};
+
+      if (search) {
+        query.$or = [
+          {
+            displayName: { $regex: search, $options: "i" },
+          },
+          { email: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      if (role && role !== "all") {
+        query.role = role;
+      }
+
+      const cursor = userCollection.find(query).sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
