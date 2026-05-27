@@ -297,6 +297,7 @@ async function run() {
         const update = {
           $set: {
             paymentStatus: "paid",
+            deliveryStatus: "pending-pickup",
             trackingId: trackingId,
           },
         };
