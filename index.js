@@ -161,9 +161,12 @@ async function run() {
     // parcels api
     app.get("/parcels", async (req, res) => {
       const query = {};
-      const { email } = req.query;
+      const { email, deliveryStatus } = req.query;
       if (email) {
         query.senderEmail = email;
+      }
+      if (deliveryStatus) {
+        query.deliveryStatus = deliveryStatus;
       }
 
       const options = { sort: { createdAt: -1 } };
@@ -186,6 +189,35 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/parcels/:id", async (req, res) => {
+      const id = req.params.id;
+      const { riderId, riderName, riderEmail } = req.body;
+      const query = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          deliveryStatus: "picked-up",
+          riderId,
+          riderName,
+          riderEmail,
+        },
+      };
+      const result = await parcelsCollection.updateOne(query, updateDoc);
+      res.send(result);
+
+      // update rider status
+      const riderQuery = { _id: new ObjectId(riderId) };
+      const updateRiderDoc = {
+        $set: {
+          workStatus: "In Delivery",
+        },
+      };
+      const riderResult = await ridersCollection.updateOne(
+        riderQuery,
+        updateRiderDoc,
+      );
+      res.send(riderResult);
+    });
+
     app.delete("/parcels/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -204,11 +236,18 @@ async function run() {
     });
 
     app.get("/riders", async (req, res) => {
+      const { status, district, workStatus } = req.query;
       const query = {};
       if (req.query.status) {
         query.status = req.query.status;
       }
-      const cursor = ridersCollection.find(query).sort({ createdAt: 1 });
+      if (district) {
+        query.district = district;
+      }
+      if (workStatus) {
+        query.workStatus = workStatus;
+      }
+      const cursor = ridersCollection.find(query).sort({ createdAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -224,6 +263,7 @@ async function run() {
         const updatedDoc = {
           $set: {
             status: status,
+            workStatus: "available",
           },
         };
         const result = await ridersCollection.updateOne(query, updatedDoc);
@@ -279,6 +319,7 @@ async function run() {
 
       // checking if payment is already is in database to avoid duplicate entry
       const transactionId = session.payment_intent;
+      const trackingId = generateTrackingId();
       const query = { transactionId: transactionId };
       const existingPayment = await paymentCollection.findOne(query);
       if (existingPayment) {
@@ -290,7 +331,6 @@ async function run() {
         });
       }
 
-      const trackingId = generateTrackingId();
       if (session.payment_status === "paid") {
         const id = session.metadata.parcelId;
         const query = { _id: new ObjectId(id) };
