@@ -182,7 +182,7 @@ async function run() {
         query.riderEmail = riderEmail;
       }
       if (deliveryStatus) {
-        query.deliveryStatus = deliveryStatus;
+        query.deliveryStatus = { $in: ["driver_assigned", "rider_arriving"] };
       }
       const cursor = parcelsCollection.find(query);
       const result = await cursor.toArray();
@@ -241,6 +241,13 @@ async function run() {
         },
       };
       const result = await parcelsCollection.updateOne(query, updateDoc);
+
+      if (deliveryStatus === "pending-pickup") {
+        await ridersCollection.updateOne(
+          { email: req.body.riderEmail },
+          { $set: { workStatus: "available" } },
+        );
+      }
       res.send(result);
     });
 
