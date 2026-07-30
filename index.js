@@ -223,7 +223,7 @@ async function run() {
 
     app.patch("/parcels/:id", async (req, res) => {
       const id = req.params.id;
-      const { riderId, riderName, riderEmail } = req.body;
+      const { riderId, riderName, riderEmail, trackingId } = req.body;
       const query = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
@@ -247,11 +247,15 @@ async function run() {
         riderQuery,
         updateRiderDoc,
       );
+
+      // log tracking
+      logTracking(trackingId, "driver_assigned");
+
       res.send(riderResult);
     });
 
     app.patch("/parcels/:id/status", async (req, res) => {
-      const { deliveryStatus, riderId } = req.body;
+      const { deliveryStatus, riderId, trackingId } = req.body;
       const query = { _id: new ObjectId(req.params.id) };
       const updateDoc = {
         $set: {
@@ -281,6 +285,9 @@ async function run() {
           { $set: { workStatus: "available" } },
         );
       }
+
+      // log tracking
+      logTracking(trackingId, deliveryStatus);
       res.send(result);
     });
 
@@ -423,8 +430,7 @@ async function run() {
         };
         if (session.payment_status === "paid") {
           const resultPayment = await paymentCollection.insertOne(paymentInfo);
-          logTracking;
-          (trackingId, "pending_pickup");
+          logTracking(trackingId, "pending_pickup");
           res.send({
             success: true,
             modifyParcel: result,
