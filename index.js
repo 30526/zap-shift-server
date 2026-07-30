@@ -79,6 +79,7 @@ async function run() {
     const parcelsCollection = db.collection("parcels");
     const paymentCollection = db.collection("payments");
     const ridersCollection = db.collection("riders");
+    const trackingsCollection = db.collection("trackings");
 
     // custom middlewear for admin access verification
     const verifyAdmin = async (req, res, next) => {
@@ -90,6 +91,19 @@ async function run() {
       }
       next();
     };
+
+    // log tracking
+    const logTracking = async (trackingId, status) => {
+      const log = {
+        trackingId,
+        status,
+        detail: status.split("_").join(" "),
+        createdAt: new Date(),
+      };
+      const result = await trackingsCollection.insertOne(log);
+      return result;
+    };
+
     // user related api
     app.get("/users", verifyFirebaseToken, async (req, res) => {
       const search = req.query.search;
@@ -409,6 +423,8 @@ async function run() {
         };
         if (session.payment_status === "paid") {
           const resultPayment = await paymentCollection.insertOne(paymentInfo);
+          logTracking;
+          (trackingId, "pending_pickup");
           res.send({
             success: true,
             modifyParcel: result,
