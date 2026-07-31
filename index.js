@@ -357,6 +357,14 @@ async function run() {
       },
     );
 
+    // tarcking related apis
+    app.get("/trackings/:trackingId/logs", async (req, res) => {
+      const trackingId = req.params.trackingId;
+      const query = { trackingId };
+      const result = await trackingsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     // stripe payment apis
     app.post("/create-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
