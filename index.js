@@ -216,7 +216,10 @@ async function run() {
 
     app.post("/parcels", async (req, res) => {
       const parcel = req.body;
+      const trackingId = generateTrackingId();
       parcel.createdAt = new Date();
+      parcel.trackingId = trackingId;
+      logTracking(trackingId, "parcel_created");
       const result = await parcelsCollection.insertOne(parcel);
       res.send(result);
     });
@@ -279,7 +282,7 @@ async function run() {
 
       const result = await parcelsCollection.updateOne(query, updateDoc);
 
-      if (deliveryStatus === "pending-pickup") {
+      if (deliveryStatus === "payment_successfull") {
         await ridersCollection.updateOne(
           { email: req.body.riderEmail },
           { $set: { workStatus: "available" } },
@@ -387,6 +390,7 @@ async function run() {
         metadata: {
           parcelId: paymentInfo.parcelId,
           parcelName: paymentInfo.parcelName,
+          trackingId: paymentInfo.trackingId,
         },
         success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
@@ -400,17 +404,19 @@ async function run() {
 
       // checking if payment is already is in database to avoid duplicate entry
       const transactionId = session.payment_intent;
-      const trackingId = generateTrackingId();
+
       const query = { transactionId: transactionId };
       const existingPayment = await paymentCollection.findOne(query);
       if (existingPayment) {
         return res.send({
-          success: true,
           message: "Payment already processed",
           transactionId,
           trackingId: existingPayment.trackingId,
         });
       }
+
+      // use the previous tracking id created during the parcel create which was set to the session metadata during session creation
+      const trackingId = session.metadata.trackingId;
 
       if (session.payment_status === "paid") {
         const id = session.metadata.parcelId;
@@ -418,7 +424,7 @@ async function run() {
         const update = {
           $set: {
             paymentStatus: "paid",
-            deliveryStatus: "pending-pickup",
+            deliveryStatus: "payment_successfull",
             trackingId: trackingId,
           },
         };
